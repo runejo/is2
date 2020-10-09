@@ -1,4 +1,4 @@
-FROM maven:3.6-jdk-11 AS build
+FROM maven:3.6-jdk-14 AS build
 
 COPY src /usr/src/app/src
 
