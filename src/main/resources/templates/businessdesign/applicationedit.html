@@ -51,13 +51,14 @@
 				<!-- Breadcrumb-->
 				<ol class="breadcrumb border-0 m-0">
 					<li class="breadcrumb-item"><a th:href="@{/}">Home</a></li>
-					<li class="breadcrumb-item"><span th:text="#{bs.home.link}">Business
+					<li class="breadcrumb-item"><span th:text="#{sd.home.link}">Services design</span></li>
+					<li class="breadcrumb-item"><span th:text="#{ase.home.link}">Application
 							service edit</span></li>
 				</ol>
 				<!-- Right navigation menu -->
 				<div class="c-header-nav d-md-down-none mfe-2">
 					<a class="c-header-nav-link" th:title="#{session.button.close}"
-						th:href="@{'/busservlist'}"> <i class="fa fa-close"></i>&nbsp;<span
+						th:href="@{'/busservlist?param=2'}"> <i class="fa fa-close"></i>&nbsp;<span
 						th:text="#{Layout.Close}"></span>
 					</a>
 				</div>
@@ -75,8 +76,8 @@
 
 								<div class="card">
 									<div class="card-header">
-										<span th:text="#{as.label.create.new}">New Application
-											Service</span>
+										<span th:text="#{ase.home.link}">Application
+											Service Edit</span>
 
 									</div>
 									<div class="card-body">

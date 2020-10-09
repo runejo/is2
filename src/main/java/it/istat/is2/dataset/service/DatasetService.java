@@ -1,13 +1,13 @@
 /**
  * Copyright 2019 ISTAT
- *
+ * <p>
  * Licensed under the EUPL, Version 1.1 or – as soon they will be approved by
  * the European Commission - subsequent versions of the EUPL (the "Licence");
  * You may not use this work except in compliance with the Licence. You may
  * obtain a copy of the Licence at:
- *
+ * <p>
  * http://ec.europa.eu/idabc/eupl5
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the Licence is distributed on an "AS IS" basis, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -22,6 +22,7 @@
  * @version 1.0
  */
 package it.istat.is2.dataset.service;
+
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -29,12 +30,17 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import javax.transaction.Transactional;
+
+import javax.persistence.EntityManager;
+
+import org.hibernate.Session;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import it.istat.is2.app.dao.SqlGenericDao;
 import it.istat.is2.app.util.IS2Const;
 import it.istat.is2.dataset.dao.DatasetColumnDao;
@@ -61,8 +67,15 @@ public class DatasetService {
     @Autowired
     private StatisticalVariableClsDao variabileSumDao;
 
-    public DatasetFile save(HashMap<String, ArrayList<String>> campi, HashMap<Integer, String> valoriHeaderNum,
-            String labelFile, Long tipoDato, String separatore, String desc, String idsessione) throws Exception {
+    @Autowired
+    protected EntityManager em;
+
+    @Transactional
+    public DatasetFile save(final Map<String, ArrayList<String>> campi, final Map<Integer, String> valoriHeaderNum,
+                            final String labelFile, final Long tipoDato, final String separatore, final String desc,
+                            final String idsessione) throws Exception {
+
+        Session session = em.unwrap(Session.class);
 
         DatasetFile dFile = new DatasetFile();
 
@@ -76,42 +89,41 @@ public class DatasetService {
         dFile.setFieldSeparator(separatore);
         dFile.setLastUpdate(new Date());
         dFile.setTotalRows(campi.get(valoriHeaderNum.get(0)).size());
-        List<DatasetColumn> colonne = new ArrayList<DatasetColumn>();
+
+        dFile = datasetFileDao.save(dFile);
         short ord = 0;
 
         for (int i = 0; i < valoriHeaderNum.size(); i++) {
             String kCampi = valoriHeaderNum.get(i);
-            ArrayList<String> vals = campi.get(kCampi);
-            DatasetColumn dc = new DatasetColumn();
+            final DatasetColumn dc = new DatasetColumn();
             dc.setDatasetFile(dFile);
-            dc.setName(kCampi.replaceAll("\\.", "_"));
+            dc.setName(kCampi.replaceAll("\\.|\\s", "_"));
             dc.setOrderCode(Short.valueOf(ord));
-            dc.setContentSize(vals.size());
+            dc.setContentSize(campi.get(kCampi).size());
             ord += 1;
-            dc.setContents(vals);
-            colonne.add(dc);
+            dc.setContents(campi.get(kCampi));
+
+            dc.setDatasetFile(dFile);
+            datasetColumnDao.save(dc);
+            session.flush();
+            session.clear();
+            dc.getContents().clear();
+            campi.get(kCampi).clear();
+
         }
-        dFile.setColumns(colonne);
-        dFile = datasetFileDao.save(dFile);
 
         return dFile;
     }
 
-    public DatasetColumn salvaColonna(DatasetColumn dcol) throws Exception {
+    public DatasetColumn salvaColonna(DatasetColumn dcol) {
 
-        DatasetColumn dC;
-        try {
-            dC = datasetColumnDao.save(dcol);
-        } catch (Exception e) {
-            return null;
-        }
+        return datasetColumnDao.save(dcol);
 
-        return dC;
     }
 
     public List<DatasetFile> findAllDatasetFile() {
-    	return (List<DatasetFile>) datasetFileDao.findAll();
-         
+        return datasetFileDao.findAll();
+
     }
 
     public DatasetFile findDataSetFile(Long id) {
@@ -123,18 +135,18 @@ public class DatasetService {
     }
 
     public DatasetFile findDataSetFileSQL(Long id) {
-    	return sqlgenericDao.findGenericDatasetFileOne(id);
-        
+        return sqlgenericDao.findGenericDatasetFileOne(id);
+
     }
 
     public List<DatasetFile> findAllDatasetFileSQL() {
-    	return sqlgenericDao.findGenericDatasetFileAll();
-        
+        return sqlgenericDao.findGenericDatasetFileAll();
+
     }
 
     public List<DatasetColumn> findAllDatasetColumnSQL(Long dFile, Integer rigaInf, Integer rigaSup) {
-    	return datasetColumnDao.findDatasetColumnbyQuery(dFile, rigaInf, rigaSup);
-        
+        return datasetColumnDao.findDatasetColumnbyQuery(dFile, rigaInf, rigaSup);
+
     }
 
     public List<DatasetColumn> findAllNameColum(Long dFile) {
@@ -154,12 +166,12 @@ public class DatasetService {
     }
 
     public String loadDatasetValori(Long dfile, Integer length, Integer start, Integer draw,
-            HashMap<String, String> parametri, String nameColumnToOrder, String dirColumnOrder) throws JSONException {
+                                    HashMap<String, String> parametri, String nameColumnToOrder, String dirColumnOrder) throws JSONException {
 
         int offset = 2;
         List<Object[]> resulFieldstList = sqlgenericDao.findDatasetIdColAndName(dfile);
-        List<Object[]> dataList = sqlgenericDao.findDatasetDataViewParamsbyQuery(resulFieldstList, dfile, start,
-                length, parametri, nameColumnToOrder, dirColumnOrder);
+        List<Object[]> dataList = sqlgenericDao.findDatasetDataViewParamsbyQuery(resulFieldstList, dfile, start, length,
+                parametri, nameColumnToOrder, dirColumnOrder);
 
         Integer numRighe = 0;
         JSONArray data = new JSONArray();
@@ -184,15 +196,15 @@ public class DatasetService {
     }
 
     public List<DatasetColumn> findAllDatasetColumnQueryFilter(Long dFile, Integer rigaInf, Integer rigaSup,
-            String filterFieldName, String filterFieldValue, List<String> fieldSelect) {
-        List<DatasetColumn> dataList = datasetColumnDao.findDatasetColumnbyQueryFilter(dFile, rigaInf, rigaSup,
-                filterFieldName, filterFieldValue, fieldSelect);
-        return dataList;
+                                                               String filterFieldName, String filterFieldValue, List<String> fieldSelect) {
+        return datasetColumnDao.findDatasetColumnbyQueryFilter(dFile, rigaInf, rigaSup, filterFieldName,
+                filterFieldValue, fieldSelect);
+
     }
 
     public List<StatisticalVariableCls> findAllVariabiliSum() {
-        Iterable<StatisticalVariableCls> variabileSum = variabileSumDao.findAllVariables();
-        return (List<StatisticalVariableCls>) variabileSum;
+        return variabileSumDao.findAllVariables();
+
     }
 
     public List<DatasetColumn> findByDatasetFile(DatasetFile idfile) {
@@ -204,7 +216,7 @@ public class DatasetService {
         DatasetFile datasetFile = findDataSetFile(idfile);
 
         Map<String, List<String>> ret = new LinkedHashMap<>();
-        for (Iterator<?> iterator = datasetFile.getColumns().iterator(); iterator.hasNext();) {
+        for (Iterator<?> iterator = datasetFile.getColumns().iterator(); iterator.hasNext(); ) {
             DatasetColumn dc = (DatasetColumn) iterator.next();
             ret.put(dc.getName(), dc.getContents());
         }
@@ -220,17 +232,17 @@ public class DatasetService {
     }
 
     public List<String> findTablesDB(String db) {
-       
+
         return sqlgenericDao.findTablesDB(db);
     }
 
     public List<String> findFieldsTableDB(String db, String table) {
-        
+
         return sqlgenericDao.findFieldsTableDB(db, table);
     }
 
     public DatasetFile loadDatasetFromTable(String idsessione, String dbschema, String tablename, String[] fields) {
-         
+
         DatasetFile dFile = new DatasetFile();
         dFile.setFileLabel(dbschema);
         DataTypeCls tipoD = new DataTypeCls(IS2Const.DATA_TYPE_DATASET);
@@ -258,7 +270,7 @@ public class DatasetService {
         dFile = datasetFileDao.save(dFile);
         return dFile;
     }
-    
+
     public List<Object[]> getDataset(Long idfile) {
 
         DatasetFile datasetFile = this.findDataSetFile(idfile);
@@ -267,18 +279,19 @@ public class DatasetService {
         List<Object[]> resultFieldstList;
         if (datasetFile != null) {
             resultFieldstList = sqlgenericDao.findDatasetIdColAndName(idfile);
-            dataList = sqlgenericDao.findDatasetDataViewParamsbyQuery(resultFieldstList, idfile, 0, datasetFile.getTotalRows(), null, null, null);
+            dataList = sqlgenericDao.findDatasetDataViewParamsbyQuery(resultFieldstList, idfile, 0,
+                    datasetFile.getTotalRows(), null, null, null);
         }
         return dataList;
     }
-    
-    public List<String> getDatasetColumns(Long idfile)  {
+
+    public List<String> getDatasetColumns(Long idfile) {
 
         List<String> columnList = new ArrayList<>();
         List<Object[]> resulFieldstList = sqlgenericDao.findDatasetIdColAndName(idfile);
         if (resulFieldstList != null) {
-            for(Object[] result : resulFieldstList){
-                columnList.add((String)result[1]);
+            for (Object[] result : resulFieldstList) {
+                columnList.add((String) result[1]);
             }
         }
         return columnList;

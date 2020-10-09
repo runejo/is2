@@ -2,6 +2,7 @@ package it.istat.is2.workflow.engine;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,24 +25,24 @@ public class EngineR {
     StepRuntimeDao stepRuntimeDao;
     @Autowired
     LogService logService;
-    
+
     @Value("${path.script.R}")
     protected String pathR;
-    
+
     protected String fileScriptR;
     protected String command;
     protected DataProcessing dataProcessing;
     protected StepInstance stepInstance;
     protected LinkedHashMap<String, ArrayList<StepRuntime>> dataMap;
     protected Map<String, AppRole> rolesMap;
-    protected LinkedHashMap<String, ArrayList<String>> parametersMap;
-    protected LinkedHashMap<String, ArrayList<String>> worksetVariables;
-    protected LinkedHashMap<String, ArrayList<String>> rulesetMap;
+    protected Map<String, List<String>> parametersMap;
+    protected Map<String, Map<String, List<String>>> worksetVariables;
+    protected Map<String, List<String>> rulesetMap;
 
     protected LinkedHashMap<String, ArrayList<String>> variablesRolesMap;
 
-    protected LinkedHashMap<String, ArrayList<String>> worksetOut;
+
     protected LinkedHashMap<String, String> parameterOut;
-    protected LinkedHashMap<String, ArrayList<String>> rolesOut;
+
     protected LinkedHashMap<String, String> rolesGroupOut;
 }

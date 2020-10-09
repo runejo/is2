@@ -25,9 +25,10 @@ var _ctx = $("meta[name='ctx']").attr("content");
 var toggle = true;
 var associazioneVarRoleBean = [];
 var tmpVarSel = {};
-var checkedPrefix = true;
+var checkedPrefix = false;
 var tabTemplate = "<li><a href='#{href}'><span class='prefix' style='#{prefixStyle}'>#{prefixTab}</span>#{label} @ <span title='#{roleName}'>#{roleCode}</span></a> <span class='ui-icon ui-icon-close' role='presentation'>Remove Tab</span></li>";
 
+var paramDialog='add';
 $(document).ready(function () {
 
     $("#contenuto_file").hide();
@@ -50,7 +51,7 @@ $(document).ready(function () {
                 + "<'row'<'col-sm-12'tr>>"
                 + "<'row'<'col-sm-5'i><'col-sm-7'p>>",
         paging: false,
-        rowReorder: true,
+        rowReorder: false,
         columnDefs: [
         	  { orderable: true, targets: [0,1,2] },
               { orderable: false, targets: '_all' }
@@ -132,30 +133,19 @@ $(document).ready(function () {
         tabs.tabs("refresh");
     });
 
-   checkedPrefix = $(this).prop('checked');
+   checkedPrefix =  $('#check-prefix-dataset').prop('checked');
    $(".prefix").toggle(checkedPrefix); 
-    
+
+   
+   $('add-parametri-workset-modal').on('dialogclose', function(event) {
+	  alert("add"); 
+	});
+   $('mod-parametri-workset-modal').on('dialogclose', function(event) {
+	   alert("addddd"); 
+	});
+   
 });
 
-var addRow = {
-    "title": "Add Row",
-    "click": function () {
-        var value = this.getValue();
-        value.push({});
-        this.setValue(value);
-    }
-};
-
-var removeRow = {
-    "title": "Remove Row",
-    "click": function () {
-        var value = this.getValue();
-        if (value.length > 0) {
-            value.pop();
-            this.setValue(value);
-        }
-    }
-};
 
 function openAddParameter(identifier) {
     var idParam = $(identifier).data('param-id');
@@ -172,11 +162,14 @@ function openAddParameter(identifier) {
             return eval('(' + value + ')');
         } else if (key === "dataSource") {
             return eval(value);
+        } else if (key === "postRender") {
+            return eval(value);    
         } else {
             return value;
         }
     });
     $('#add-param').alpaca(jsonObj);
+    paramDialog='add';
     $("#add-parametri-workset-modal").modal('show');
 }
 
@@ -276,8 +269,11 @@ function openDlgModParametriWorkset(identifier) {
     var data = $(identifier).data('value-param');
     if (!data)
         data = "";
+    var postRender = jsontemplate["postRender"];
+    
+    if (!postRender) postRender="";// eval(postRender);
     $('#edit-parameters').val(idWorkset);
-    var dataContent = "{\"data\":" + JSON.stringify(data) + ",\"schema\":" + JSON.stringify(schema) + ",\"options\":" + JSON.stringify(options) + "}";
+    var dataContent = "{\"data\":" + JSON.stringify(data) + ",\"schema\":" + JSON.stringify(schema) + ",\"options\":" + JSON.stringify(options) + ",\"postRender\":" + JSON.stringify(postRender) + "}";
     $('#edit-param').empty();
     var jsonObj = JSON.parse(dataContent, function (key, value) {
         if (key === "addRow") {
@@ -286,12 +282,15 @@ function openDlgModParametriWorkset(identifier) {
             return eval('(' + value + ')');
         } else if (key === "dataSource") {
             return eval(value);
+        } else if (key === "postRender") {
+            return eval(value);
         } else {
             return value;
         }
     });
     $('#edit-param').alpaca(jsonObj);
     $("#idStepRunMod").val(idParam);
+    paramDialog='mod';
     $("#mod-parametri-workset-modal").modal("show");
 }
 
@@ -713,7 +712,7 @@ $(function () {
         stop: function () {
             var result = $("#select-result").empty();
             variablesArr = new Array();
-            $(".ui-selected", this).each(function () {
+            $("li.ui-selected", this).each(function () {
                 var currSel = $(this).attr("value");
                 tmpArr = currSel.split('~');
                 variablesArr.push({'idVar': tmpArr[0], 'name': tmpArr[1], 'labelTab': tmpArr[2], 'prefixTab': tmpArr[3]});

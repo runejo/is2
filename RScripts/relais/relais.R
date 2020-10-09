@@ -15,22 +15,24 @@ rm(list=ls())
 #percorso_allert="FSAllert.Rout"
 
 fellegisunter <- function(workset, roles, wsparams=NULL, ...) {
- stdout <- vector('character')
- con <- textConnection('stdout', 'wr', local = TRUE)
- sink(con)
 
- ct <- roles$CT
- print(ct)
+workset_ct=workset$CT
+	
+ct <- roles$CT
+
+
  nvar=length(ct)-1
- #yy <-  as.data.frame(matrix(as.numeric(workset[,ct]),ncol=length(ct),nrow=nrow(workset)))
- yy <- workset
- #print(workset)
+ #yy <-  as.data.frame(matrix(as.numeric(workset_ct[,ct]),ncol=length(ct),nrow=nrow(workset_ct)))
+ yy <- workset_ct
+
  colnames(yy)<- ct
  #print(yy)	 
 	muTableName="muTable"
 	varmuTableName="varmuTable"
 	r_out <- vector()
-	
+	var_est<-c()
+	result<-c()
+ 
 	eps=0.0000001
 	iter=1500
 	interazioni=vector("list", nvar)
@@ -47,7 +49,7 @@ fellegisunter <- function(workset, roles, wsparams=NULL, ...) {
 	#print(variabili)
 	
 	nomimatvar = names(yy)[1:nvar]
-	print( names(yy))
+	
 	 
 	#aggiorno i valori di frequency a o
 	if(nrow(yy[yy$FREQUENCY==0,])>0)
@@ -101,35 +103,32 @@ fellegisunter <- function(workset, roles, wsparams=NULL, ...) {
 	
 	#1 check su stime v1-vn e var latente x (vedi blocco laura)
 	check = 0;
-	print(nvar)
+	
 	for(i in 1:nvar){
 	if((l[[i]][1,1]>=l[[i]][2,1] && l[[i]][1,2]>=l[[i]][2,2]) || (l[[i]][1,1]<l[[i]][2,1] && l[[i]][1,2]<l[[i]][2,2]))
 	 check = 1;
 	}
 	if(check==1){
-		#Messaggio di warning non blocante
-		# msg = "WARNING: one or more variables give inconsistent estimates."
-		#Messaggio di errore blocante
+
+		#Error message and stop elab
 		 msg = "ERROR: one or more variables give inconsistent estimates. Please, check the variables in the model or try to reduce the search space.";
-		 #msg2 = paste("See table ",varmuTableName," for more details."); 
-		 print(msg);
-		 #print(msg2);
-		 print(l);
-		 #write.table(l, file = percorso_fail,row.names=FALSE,sep=":",quote=F)
+		 msg2 = paste("See MARGINAL_PROBABILITIES output for more details."); 
+		 
+		 print(msg)
+		 print(msg2)
+		
+		 
 		 #default value to p for the marginal prob table
 		 p <- 0
 	}else{
-		#2 check su stime sulla frontiera
-		#Messaggio di warning non blocante
 		
 		vett_cond=vett[vett>0.99999]
 		if (length(vett_cond)>=1)
 		{
-		# messaggio di warning non bloccante, si salvano i parametri nella tabella, e si va avanti con la mutable
-			msg3 = paste("WARNING: one or more nearly boundary parameters. See ",percorso_allert," for more details.");
-			print(msg3);
-			print(l);
-		   #  write.table(l, file = percorso_allert,row.names=FALSE,sep=":",quote=F)
+		# warning message continue elab
+			msg = paste("WARNING: one or more nearly boundary parameters.");
+			msg2 = paste("See MARGINAL_PROBABILITIES output for more details.");
+			print(msg);
 		}
 		#produce la matrice in output
 		#per la stima di m e u utilizziamo le frequenze attese dal modello
@@ -173,19 +172,137 @@ fellegisunter <- function(workset, roles, wsparams=NULL, ...) {
 		# inserisco i nomi delle matvar per creare la tabella
 		names(r_out)[1:nvar]=nomimatvar
 		
+		
 	}
+
+
 	
-	# creo la tabella delle marginali
+			# creo la tabella delle marginali
 	var_est <- data.frame(rep(nomimatvar, rep(2,length(nomimatvar))),rep(c("1","0"),length(nomimatvar)),mvar,uvar,rep(p,2*length(nomimatvar)),stringsAsFactors=FALSE)
 	names(var_est)=c("variable","comparison","m","u","p")
 	
- roles <- list (FS=names(r_out))
- rolesgroup <- list (FS= c("FS"))
 
- result <-list( workset_out=r_out, roles_out= roles,rolesgroup_out= rolesgroup, var_est = var_est, log = stdout)
+ roles <- list (FS=names(r_out),MP=names(var_est))
+ rolesgroup <- list (FS= c("FS"), MP= c("MP"))
  
- sink()
- close(con)
- return(result)
+ fs_out<-list(FS=r_out,MP = var_est)
+
+ result <-list( workset_out=fs_out, roles_out= roles, rolesgroup_out= rolesgroup,  log = '')
+
+}
+
+
+##################################################
+### function: lpreduction
+### phase: Matching consraint - apply a contraint to reduce the match pairs
+### parameter: ReducType ('1to1','1toN','Nto1')
+### input: Math_table  output: Match_table_reduced
+### packages required: lpSolve + slam
+##################################################
+
+library("lpSolve")
+library("slam")
+
+lpreduction <- function(workset, roles, wsparams=NULL, ...) {
+
+ print("read input");
+ workset_mt=workset$MT
+ mt <- roles$MT
+ ReducType <- '1to1'
+
+ print("start procedure");
+# command1: apply preliminary filter to input data
+filtered=workset_mt[,c("ROW_A","ROW_B","P_POST","R")] 
+
+# log
+dim(filtered)
+
+# command2: pre-processing input
+# count of unique dataset ID records
+n= length(unique(filtered[,1]))
+m= length(unique(filtered[,2])) 
+# add sequential keys for dataset records
+A=cbind(ROW_A=unique(filtered[,1]),A=1:n) 
+B=cbind(ROW_B=unique(filtered[,2]),B=1:m)
+filtered =merge(B, filtered)
+filtered =merge(A, filtered)
+dat=t(filtered)
+
+# command3: preparing constraint parameter
+if (ReducType=='1toN') {
+   constr <- matrix(c(as.numeric(dat[2,]),rep(1:ncol(dat)),rep(1,ncol(dat))),ncol=3)
+   #constr <- simple_triplet_matrix(as.numeric(dat[2,]), rep(1:ncol(dat)), rep(1,ncol(dat)), nrow=n, ncol=ncol(dat))     
+   diseq=rep('<=',n)  
+   ones=rep(1,n)  
+} else if (ReducType=='Nto1') {
+   constr <- matrix(c(as.numeric(dat[4,]),rep(1:ncol(dat)),rep(1,ncol(dat))),ncol=3)
+   #constr <- simple_triplet_matrix(as.numeric(dat[4,]), rep(1:ncol(dat)), rep(1,ncol(dat)), nrow=m, ncol=ncol(dat))     
+   diseq=rep('<=',m)  
+   ones=rep(1,m)
+} else {
+   constr <- matrix(c(as.numeric(dat[2,]),as.numeric(dat[4,])+n,rep(1:ncol(dat),2),rep(1,(2*ncol(dat)))),ncol=3)
+   #constr <- simple_triplet_matrix(c(as.numeric(dat[2,]),as.numeric(dat[4,])+n), rep(1:ncol(dat),2), rep(1,(2*ncol(dat))), nrow=(n+m), ncol=ncol(dat))     
+   diseq=rep('<=',m+n)  
+   ones=rep(1,m+n)
+}
+
+# command4: coefficients for target function 
+coeff=dat[6,]    
+
+ print("lp execution");
+# command5: LP execution  -- note: ROI.plugin.clp not available in renjin -- use: lpSolve
+# LP <- ROI::OP(as.numeric(coeff),
+#                         ROI::L_constraint(L = constr,  dir = diseq,  rhs = ones), max = TRUE)   
+#ret <- ROI::ROI_solve(x = LP, solver = "clp")
+
+ret=lp ("max", coeff, , diseq, ones, dense.const=constr)  
+
+# solution is primal infeasible
+# solving of ambiguous cases 
+if (ret$status$code==1) {
+  posit <- sum(ret$solution>1)
+  if (posit>0) {
+     coeff[which(ret$solution>1)] <- as.numeric(coeff[which(ret$solution>1)]) * 2^(posit:1)
+	 
+	 # command5bis: new LP execution -- use: lpSolve
+	 #LP <- ROI::OP(as.numeric(coeff),
+     #                    ROI::L_constraint(L = constr,  dir = diseq,  rhs = ones), max = TRUE)   
+     #ret <- ROI::ROI_solve(x = LP, solver = "clp")
+	 ret=lp ("max", coeff, , diseq, ones, dense.const=constr)  
+  }
+}
+
+# log
+ret$status
+
+# prepare the reduced set of pairs
+#if (ret$status$code==0) {
+#    reduc <- t(dat[c(1,3,5,6),solution(ret)>0.9])
+#} else {
+#    # if solution is infeasible still
+#    reduc <- t(dat[c(1,3,5,6),FALSE])
+#}
+
+# save the reduce table
+#reducPairs <- as.data.frame(reduc)
+
+#write.table(reducPairs , file = ReducedFile, sep = ";", row.names = FALSE, quote = FALSE, col.names = TRUE)
+
+ ###################################
  
+ # prepare the reduced set of pairs
+ if (ret$status$code==0) {
+     reduc <- workset_mt[solution(ret)>0.9,]
+ } else {
+     # if solution is infeasible still
+     reduc <- workset_mt[FALSE,]
+ }
+ 
+ roles <- list (MTR=names(reduc))
+ rolesgroup <- list (MTR= c("MTR"))
+ 
+ fs_out<-list(MTR=reduc)
+
+ result <-list( workset_out=fs_out, roles_out= roles, rolesgroup_out= rolesgroup,  log = '')
+
 }

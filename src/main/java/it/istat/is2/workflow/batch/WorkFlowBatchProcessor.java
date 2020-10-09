@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import it.istat.is2.app.service.LogService;
 import it.istat.is2.app.service.NotificationService;
 import it.istat.is2.workflow.dao.BusinessProcessDao;
 import it.istat.is2.workflow.domain.DataProcessing;
@@ -41,36 +42,44 @@ public class WorkFlowBatchProcessor implements ItemReader<DataProcessing> {
     @Autowired
     EngineFactory engineFactory;
 
+    @Autowired
+    private LogService logService;
 
     @Autowired
-	private NotificationService notificationService;
+    private NotificationService notificationService;
 
     @Override
     public DataProcessing read()
             throws Exception, UnexpectedInputException, ParseException, NonTransientResourceException {
-        DataProcessing elaborazione = workflowService.findDataProcessing(idElaborazione);
-        BusinessProcess businessProcess = businessProcessDao.findById(idBProc).orElse(new BusinessProcess());
-        for (Iterator<?> iterator = businessProcess.getBusinessSteps().iterator(); iterator.hasNext();) {
-            ProcessStep businessStep = (ProcessStep) iterator.next();
-            for (Iterator<?> iteratorStep = businessStep.getStepInstances().iterator(); iteratorStep.hasNext();) {
-                StepInstance stepInstance = (StepInstance) iteratorStep.next();
-                elaborazione = doStep(elaborazione, stepInstance);
-            }
-        }
+        final DataProcessing elaborazione = workflowService.findDataProcessing(idElaborazione);
+        final BusinessProcess businessProcess = businessProcessDao.findById(idBProc).orElse(new BusinessProcess());
+        businessProcess.getBusinessSteps().forEach(businessStep -> {
+
+            businessStep.getStepInstances().forEach(stepInstance -> {
+                try {
+                    doStep(elaborazione, stepInstance);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+        });
+
         return null;
     }
 
     public DataProcessing doStep(DataProcessing elaborazione, StepInstance stepInstance) throws Exception {
         EngineService engine = engineFactory.getEngine(stepInstance.getAppService().getEngineType());
-       
+
         try {
             engine.init(elaborazione, stepInstance);
             engine.doAction();
             engine.processOutput();
         } catch (Exception e) {
-         	 Logger.getRootLogger().error(e.getMessage());
-             notificationService.addErrorMessage("Error: " + e.getMessage());
-             throw (e);
+            Logger.getRootLogger().error(e.getMessage());
+            logService.save("Error: " + e.getMessage());
+            notificationService.addErrorMessage("Error: " + e.getMessage());
+            throw (e);
         } finally {
             engine.destroy();
         }

@@ -1,13 +1,13 @@
 /**
  * Copyright 2019 ISTAT
- *
+ * <p>
  * Licensed under the EUPL, Version 1.1 or – as soon they will be approved by
  * the European Commission - subsequent versions of the EUPL (the "Licence");
  * You may not use this work except in compliance with the Licence. You may
  * obtain a copy of the Licence at:
- *
+ * <p>
  * http://ec.europa.eu/idabc/eupl5
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the Licence is distributed on an "AS IS" basis, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -20,7 +20,6 @@
  */
 package it.istat.is2.workflow.engine;
 
-import it.istat.is2.app.util.IS2Const;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -29,32 +28,32 @@ public class EngineFactory {
 
     @Autowired
     private EngineRServe engineRServe;
-    
+
     @Autowired
     private EngineREnjin engineREInjin;
-    
+
     @Autowired
     private EngineJava engineJava;
 
     @Autowired
     private EngineSQL engineSQL;
- 
+
     public EngineService getEngine(String engineType) {
         if (engineType == null) {
             return null;
         }
-        if (engineType.equalsIgnoreCase(IS2Const.ENGINE_RSERVE)) {
+        if (engineType.equalsIgnoreCase(EngineService.ENGINE_RSERVE)) {
             return engineRServe;
 
-        } else if (engineType.equalsIgnoreCase(IS2Const.ENGINE_RENJIN)) {
+        } else if (engineType.equalsIgnoreCase(EngineService.ENGINE_RENJIN)) {
             return engineREInjin;
 
-        } else if (engineType.equalsIgnoreCase(IS2Const.ENGINE_JAVA)) {
+        } else if (engineType.equalsIgnoreCase(EngineService.ENGINE_JAVA)) {
             return engineJava;
 
-        } else if (engineType.equalsIgnoreCase(IS2Const.ENGINE_SQL)) {
+        } else if (engineType.equalsIgnoreCase(EngineService.ENGINE_SQL)) {
             return engineSQL;
-            
+
         }
 
         return null;

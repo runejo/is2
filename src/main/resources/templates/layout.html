@@ -58,7 +58,7 @@
     <body class="c-app">
 
         <!-- START SIDEBAR -->
-        <div class="c-sidebar c-sidebar-dark c-sidebar-fixed" id="sidebar" th:fragment="site-aside">
+        <div class="c-sidebar c-sidebar-dark c-sidebar-fixed c-sidebar-lg-show" id="sidebar" th:fragment="site-aside">
             <div class="c-sidebar-brand brand-full">
                 <i class="icon-chemistry"></i> <span>IS<sup>2</sup> Workbench</span>
             </div>
@@ -133,16 +133,22 @@
                         </a> 
                     </li-->
                     
-                    <!-- TEST -->
+                    <!-- TEST 
                     <li class="c-sidebar-nav-title">Service Design</li>
                      
                     <li>                    
-                    	<a class ="c-sidebar-nav-link" th:href="@{'/busservlist'}">
+                    	<a class ="c-sidebar-nav-link" th:href="@{'/busservlist?param=1'}">
                     	<i class="c-sidebar-nav-icon icon-calculator"></i>
-                           <span class="truncate" th:title="prova">Business Service Design</span>
+                           <span class="truncate" title="Services Design">Services Design</span>
                         </a> 
                     </li>
-                    
+                    <li>                    
+                    	<a class ="c-sidebar-nav-link" th:href="@{'/busservwizard'}">
+                    	<i class="c-sidebar-nav-icon icon-calculator"></i>
+                           <span class="truncate" title="SD Wizard">SD Wizard</span>
+                        </a> 
+                    </li>
+                  -->  
                     
                     
                 </ul>

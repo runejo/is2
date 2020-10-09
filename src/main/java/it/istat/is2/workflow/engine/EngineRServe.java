@@ -1,13 +1,13 @@
 /**
  * Copyright 2019 ISTAT
- *
+ * <p>
  * Licensed under the EUPL, Version 1.1 or – as soon they will be approved by
  * the European Commission - subsequent versions of the EUPL (the "Licence");
  * You may not use this work except in compliance with the Licence. You may
  * obtain a copy of the Licence at:
- *
+ * <p>
  * http://ec.europa.eu/idabc/eupl5
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the Licence is distributed on an "AS IS" basis, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -37,14 +37,11 @@ import org.rosuda.REngine.REngineException;
 import org.rosuda.REngine.RList;
 import org.rosuda.REngine.Rserve.RConnection;
 import org.rosuda.REngine.Rserve.RserveException;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-
 import it.istat.is2.app.util.IS2Const;
 import it.istat.is2.app.util.Utility;
- 
 import it.istat.is2.workflow.domain.AppRole;
 import it.istat.is2.workflow.domain.DataProcessing;
 import it.istat.is2.workflow.domain.DataTypeCls;
@@ -54,17 +51,17 @@ import it.istat.is2.workflow.domain.StepRuntime;
 import it.istat.is2.workflow.domain.TypeIO;
 import it.istat.is2.workflow.domain.Workset;
 
-
 @Service
 public class EngineRServe extends EngineR implements EngineService {
-
 
     @Value("${serverR.host}")
     private String serverRHost;
     @Value("${serverR.port}")
     private Integer serverRPort;
-     private RConnection connection;
- 
+    private RConnection connection;
+
+    private final LinkedHashMap<String, ArrayList<String>> worksetOut = new LinkedHashMap<>();
+    private final Map<String, ArrayList<String>> rolesOut = new LinkedHashMap<>();
 
     public EngineRServe(String serverRHost, int serverRPort, String pathR, String fileScriptR) {
         super();
@@ -90,24 +87,24 @@ public class EngineRServe extends EngineR implements EngineService {
         this.fileScriptR = stepInstance.getAppService().getSource();
 
         prepareEnv();
-        createConnection(null, 0);
-        bindInputColumns(worksetVariables, WORKSET_IN);
+        createConnection();
+        bindInputColumnsMap(worksetVariables, WORKSET_IN);
         bindInputColumnsParams(parametersMap, PARAMETERS_IN);
         bindInputColumns(rulesetMap, RULESET);
         setRoles(variablesRolesMap);
 
     }
 
-    private void createConnection(String server, int port) throws RserveException {
+    private void createConnection() throws RserveException {
         // Create a connection to Rserve instance running on default port 6311
-        if (port == 0) {
-            port = 6311;
+        if (serverRPort == 0) {
+        	serverRPort = 6311;
         }
 
-        if (server == null) {
+        if ( serverRHost == null||serverRHost.isEmpty()) {
             connection = new RConnection();
         } else {
-            connection = new RConnection(server,port);
+            connection = new RConnection(serverRHost, serverRPort);
         }
         connection.eval("setwd('" + pathR + "')");
         connection.eval("source('" + fileScriptR + "')");
@@ -120,12 +117,11 @@ public class EngineRServe extends EngineR implements EngineService {
         }
     }
 
-    public void bindInputColumns(Map<String, ArrayList<String>> workset, String varR)
-            throws REngineException {
+    public void bindInputColumns(Map<String, List<String>> workset, String varR) throws REngineException {
 
         if (!workset.isEmpty()) {
             List<String> keys = new ArrayList<>(workset.keySet());
-            StringBuilder  listaCampi = new StringBuilder();
+            StringBuilder listaCampi = new StringBuilder();
             int size = keys.size();
             String key = "";
 
@@ -144,12 +140,88 @@ public class EngineRServe extends EngineR implements EngineService {
                 }
 
             }
-           connection.eval(varR + " <- data.frame(" + listaCampi.substring(0, listaCampi.length() - 1) + ")"); // Create a data frame
+            connection.eval(varR + " <- data.frame(" + listaCampi.substring(0, listaCampi.length() - 1) + ")"); // Create 
+            // a
+            // data
+            // frame
         }
     }
 
-    public void bindInputColumnsParams(LinkedHashMap<String, ArrayList<String>> workset, String varR)
+    public void bindInputColumnsMap(Map<String, Map<String, List<String>>> worksetIn, String varR)
             throws REngineException {
+
+        if (!worksetIn.isEmpty()) {
+            connection.eval(varR + " <- list()");
+
+            worksetIn.forEach((keyW, workset) -> {
+            try {
+              	bindInputColumns(workset, keyW);
+              	//connection.eval("print(str("+keyW+"))");
+              	//connection.eval(varR + "[["+ keyW +"]] <- "+ keyW );
+              	connection.eval(varR + "<- c("+ varR +","+ keyW +")");
+	            } catch (REngineException e1) {
+	                throw new RuntimeException(e1);
+	            }
+            
+            }); // data
+            //connection.eval("as.data.frame("+varR+")");
+            connection.eval(varR+"<-do.call(cbind.data.frame,"+varR+")");
+            connection.eval("print(\"BICol result is:\")");
+            connection.eval("print(str("+varR+"))");
+            // engine.eval(varR + " <- data.frame(" + listaCampi.substring(0,
+            // listaCampi.length() - 1) + ")");
+            // frame
+        }
+    }
+
+    public void bindInputColumnsMap_OLD(Map<String, Map<String, List<String>>> worksetIn, String varR)
+            throws REngineException {
+
+        if (!worksetIn.isEmpty()) {
+            connection.eval(varR + " <- list()");
+
+            worksetIn.forEach((keyW, workset) -> {
+
+                try {
+                    connection.eval(keyW + " <- list() ");
+
+
+                    List<String> keys = new ArrayList<>(workset.keySet());
+                    StringBuilder listaCampi = new StringBuilder();
+                    int size = keys.size();
+                    String key;
+
+                    for (int i = 0; i < size; i++) {
+                        key = keys.get(i);
+
+                        String[] arrX = workset.get(key).toArray(new String[workset.get(key).size()]);
+                        listaCampi.append(key + ",");
+                        connection.assign(key, arrX); // Create a string vector
+                        try {
+                            if (Utility.isNumericR(arrX)) {
+                                connection.eval(key + " <- as.numeric(" + key + ")");
+                                connection.eval("append(" + keyW + "," + key + ")");
+                            }
+                        } catch (Exception e) {
+                            Logger.getRootLogger().error(e.getMessage());
+                        }
+
+                    }
+                    // engine.eval(keyW + " <- as.numeric(" + key + ")");
+                    connection.eval("append(" + varR + "," + keyW+ ")");
+                } catch (REngineException e1) {
+                    // TODO Auto-generated catch block
+                    throw new RuntimeException(e1);
+                }
+            }); // data
+            // engine.eval(varR + " <- data.frame(" + listaCampi.substring(0,
+            // listaCampi.length() - 1) + ")");
+            // frame
+        }
+    }
+    
+    
+    public void bindInputColumnsParams(Map<String, List<String>> workset, String varR) throws REngineException {
 
         if (!workset.isEmpty()) {
             List<String> keys = new ArrayList<>(workset.keySet());
@@ -163,14 +235,35 @@ public class EngineRServe extends EngineR implements EngineService {
                 listaCampi += key + ",";
                 connection.assign(key, arrX);
             }
-            
+
             listaCampi = listaCampi.substring(0, listaCampi.length() - 1);
-            
+
             connection.eval(varR + " <- list(" + listaCampi + ")");
         }
     }
 
-   
+    // new parameter setter
+    public void bindInputParams(LinkedHashMap<String, ArrayList<String>> workset, String varR) throws REngineException {
+
+        if (!workset.isEmpty()) {
+            List<String> keys = new ArrayList<>(workset.keySet());
+            String listaCampi = "";
+            int size = keys.size();
+            String key;
+
+            for (int i = 0; i < size; i++) {
+                key = keys.get(i);
+                String[] arrX = workset.get(key).toArray(new String[workset.get(key).size()]);
+                listaCampi += key + ",";
+                connection.assign(key, arrX);
+            }
+
+            listaCampi = listaCampi.substring(0, listaCampi.length() - 1);
+
+            // connection.eval(varR + " <- list(" + listaCampi + ")");
+            connection.eval("set_param(" + varR + "," + listaCampi + ")");
+        }
+    }
 
     @Override
     public void doAction() throws RserveException {
@@ -186,11 +279,34 @@ public class EngineRServe extends EngineR implements EngineService {
         if (!rulesetMap.isEmpty()) {
             command += RULESET + ",";
         }
-        
+
         command = command.substring(0, command.length() - 1);
         command += ")";
         Logger.getRootLogger().debug("Eseguo " + command);
-        
+
+        connection.eval(command);
+    }
+
+    //@Override
+    public void doAction_new() throws RserveException {
+
+        String fname = stepInstance.getMethod();
+        // mlest <- ml.est (workset, y=Y,";
+        // Aggiunto il workset e params nella lista degli argomenti della funzione (by
+        // paolinux)
+        command = OUT + "  <- is2.exec( " + WORKSET + "," + ROLES + ",";
+        if (!parametersMap.isEmpty()) {
+            command += PARAMETERS + ",";
+        }
+        command += fname + ",";
+        if (!rulesetMap.isEmpty()) {
+            command += RULESET + ",";
+        }
+
+        command = command.substring(0, command.length() - 1);
+        command += ")";
+        Logger.getRootLogger().debug("Eseguo " + command);
+
         connection.eval(command);
     }
 
@@ -201,14 +317,31 @@ public class EngineRServe extends EngineR implements EngineService {
         for (Map.Entry<String, ArrayList<String>> entry : ruoliVariabileNome.entrySet()) {
             String roleCode = entry.getKey();
             ArrayList<String> nomeVariabiliList = entry.getValue();
-            rolesList.append("'" + roleCode + "' = ").append(Utility.combineList2String4R(nomeVariabiliList)).append(",");
+            rolesList.append("'" + roleCode + "' = ").append(Utility.combineList2String4R(nomeVariabiliList))
+                    .append(",");
         }
-            connection.eval(ROLES_IN + " <-list(" + rolesList.substring(0, rolesList.length() - 1) + ")");
+        connection.eval(ROLES_IN + " <-list(" + rolesList.substring(0, rolesList.length() - 1) + ")");
     }
 
-    public void getGenericOutput(Map<String, ArrayList<String>> genericHashMap, String varR,
-            String tipoOutput) throws RserveException, REXPMismatchException {
-         try {
+    // adding new role setting by paolinux
+    public void setRole(Map<String, ArrayList<String>> ruoliVariabileNome) throws RserveException {
+        // StringBuilder rolesList = new StringBuilder();
+        Logger.getRootLogger().debug("Eseguo SetRuoli>");
+        for (Map.Entry<String, ArrayList<String>> entry : ruoliVariabileNome.entrySet()) {
+            String roleCode = entry.getKey();
+            ArrayList<String> nomeVariabiliList = entry.getValue();
+            // rolesList.append("'" + roleCode + "' =
+            // ").append(Utility.combineList2String4R(nomeVariabiliList)).append(",");
+            connection.eval("set_role(" + roleCode + "," + Utility.combineList2String4R(nomeVariabiliList) + ")");
+        }
+        // connection.eval(ROLES_IN + " <-list(" + rolesList.substring(0,
+        // rolesList.length() - 1) + ")");
+
+    }
+
+    public void getGenericOutput(Map<String, ArrayList<String>> genericHashMap, String varR, String tipoOutput)
+            throws RserveException, REXPMismatchException {
+        try {
             RList lista = connection.eval(varR + "$" + tipoOutput).asList();
             if (lista != null && !lista.isEmpty()) {
                 getRecursiveOutput(genericHashMap, lista);
@@ -223,7 +356,7 @@ public class EngineRServe extends EngineR implements EngineService {
 
     public void getGenericParamterOutput(Map<String, String> genericHashMap, String varR, String tipoOutput)
             throws RserveException, REXPMismatchException {
-     
+
         try {
             RList lista = connection.eval(varR + "$" + tipoOutput).asList();
             if (lista != null && !lista.isEmpty()) {
@@ -245,7 +378,7 @@ public class EngineRServe extends EngineR implements EngineService {
 
     public void getRolesGroup(Map<String, String> genericHashMap, String varR, String tipoOutput)
             throws RserveException, REXPMismatchException {
-        
+
         try {
             RList lista = connection.eval(varR + "$" + tipoOutput).asList();
             for (int j = 0; j < lista.size(); j++) {
@@ -302,17 +435,17 @@ public class EngineRServe extends EngineR implements EngineService {
 
     public void prepareEnv() {
         // Get all roles
-    	LinkedHashMap<String, String> rolesVariablesMap;
+        LinkedHashMap<String, String> rolesVariablesMap;
         rolesMap = ruoloDao.findByServiceAsCodMap(stepInstance.getAppService().getBusinessService());
 
         // Recupero dei ruoli di INPUT e OUTUPT e dalle istanze
         // {S=[S], X=[X], Y=[Y], Z=[Z]}
         HashMap<String, ArrayList<String>> ruoliInputStep = new HashMap<>();
         // {P=[P], M=[M], O=[O]}
-        rolesOut = new LinkedHashMap<>();
+
         rolesGroupOut = new LinkedHashMap<>();
 
-        for (Iterator<?> iterator = stepInstance.getStepInstanceSignatures().iterator(); iterator.hasNext();) {
+        for (Iterator<?> iterator = stepInstance.getStepInstanceSignatures().iterator(); iterator.hasNext(); ) {
             StepInstanceSignature stepInstanceSignature = (StepInstanceSignature) iterator.next();
             if (stepInstanceSignature.getTypeIO().getId().intValue() == IS2Const.TYPE_IO_INPUT) {
                 ArrayList<String> listv = ruoliInputStep.get(stepInstanceSignature.getAppRole().getCode());
@@ -347,7 +480,6 @@ public class EngineRServe extends EngineR implements EngineService {
         // Parameters
         parametersMap = Utility.getMapWorkSetValues(dataMap, new DataTypeCls(IS2Const.DATA_TYPE_PARAMETER));
         rulesetMap = Utility.getMapWorkSetValues(dataMap, new DataTypeCls(IS2Const.DATA_TYPE_RULESET));
-        worksetOut = new LinkedHashMap<>();
 
         // associo il codice ruolo alla variabile
         // codiceRuolo, lista nome variabili {X=[X1], Y=[Y1]}
@@ -358,7 +490,7 @@ public class EngineRServe extends EngineR implements EngineService {
         for (Map.Entry<String, ArrayList<StepRuntime>> entry : dataRuoliStepVarMap.entrySet()) {
             String codR = entry.getKey();
             ArrayList<StepRuntime> listSVariable = entry.getValue();
-            for (Iterator<StepRuntime> iterator = listSVariable.iterator(); iterator.hasNext();) {
+            for (Iterator<StepRuntime> iterator = listSVariable.iterator(); iterator.hasNext(); ) {
                 StepRuntime stepRuntime = iterator.next();
 
                 rolesVariablesMap.put(stepRuntime.getWorkset().getName(), codR);
@@ -380,7 +512,7 @@ public class EngineRServe extends EngineR implements EngineService {
         getGenericOutput(rolesOut, RESULTSET, ROLES_OUT);
         getGenericParamterOutput(parameterOut, RESULTSET, PARAMETERS_OUT);
         getGenericParamterOutput(parameterOut, RESULTSET, REPORT_OUT);
-        //getGenericOutput(worksetOut, RESULTSET, REPORT_OUT);
+        // getGenericOutput(worksetOut, RESULTSET, REPORT_OUT);
         getRolesGroup(rolesGroupOut, RESULTSET, ROLES_GROUP_OUT);
         writeLogScriptR();
         saveOutputDB();
@@ -408,7 +540,7 @@ public class EngineRServe extends EngineR implements EngineService {
             if (ruoloGruppo == null) {
                 ruoloGruppo = ROLE_DEFAULT;
             }
-            AppRole sxRuolo = rolesMap.get(ruolo)!=null? rolesMap.get(ruolo):rolesMap.get(ROLE_DEFAULT);
+            AppRole sxRuolo = rolesMap.get(ruolo) != null ? rolesMap.get(ruolo) : rolesMap.get(ROLE_DEFAULT);
             AppRole sxRuoloGruppo = rolesMap.get(ruoloGruppo);
 
             stepRuntime = Utility.retrieveStepRuntime(dataMap, nomeW, sxRuolo);

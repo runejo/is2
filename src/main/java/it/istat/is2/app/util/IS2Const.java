@@ -1,13 +1,13 @@
 /**
  * Copyright 2019 ISTAT
- *
+ * <p>
  * Licensed under the EUPL, Version 1.1 or – as soon they will be approved by
  * the European Commission - subsequent versions of the EUPL (the "Licence");
  * You may not use this work except in compliance with the Licence. You may
  * obtain a copy of the Licence at:
- *
+ * <p>
  * http://ec.europa.eu/idabc/eupl5
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the Licence is distributed on an "AS IS" basis, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -30,25 +30,16 @@ public interface IS2Const {
     public static final String SESSION_DATAPROCESSING = "dataProcessing";
     public static final String SESSION_BUSINESS_FUNCTIONS = "businessFunctionList";
     public static final String SESSION_BUSINESS_SERVICES = "businessServiceList";
-    
+
     public static final String WORKINGSET = "workingset";
 
     public static final String LIST_BUSINESS_PROCESS = "listBP";
     public static final String SESSION_DATASET = "sessionWSdataset";
 
-    public static final String ENGINE_RSERVE = "RSERVE";
-    public static final String ENGINE_RENJIN = "RENJIN";
-    public static final String ENGINE_JAVA = "JAVA";
-    public static final String ENGINE_SQL = "SQL";
-
-    public static final String ENGINE_R_LIGHT = "R-LIGHT";
-    public static final String WORKSET_FREQUENCY = "FREQUENCY";
-    public static final String WF_OUTPUT_ROLES = "roles.output";
-    public static final String WF_OUTPUT_WORKSET = "worset.output";
 
     public static final String OUTPUT_DEFAULT = "OUT";
     public static final String OUTPUT_R = "R";
-    public static final String WF_OUTPUT_ROLES_GROUP = "rolesgroup.output";
+
 
     public static final String TEXT_RULE = "RULE";
 
@@ -67,5 +58,6 @@ public interface IS2Const {
     public static final String VIEW_DATATYPE_RULESET = "RULESET";
 
     public static final String ROLE_NAME_RULESET = "RULESET";
+    public static final String SORT_ASC = "ASC";
 
 }
